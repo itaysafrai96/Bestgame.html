@@ -21,6 +21,24 @@ const UNITS = {
   angel: { name: 'מלאך', tier: 7, hp: 200, atk: 20, def: 20, dmg: [50, 50], spd: 160, cd: 1.6, range: 0, size: 24, fly: true, cost: { gold: 3000, gems: 1 }, growth: 1, ability: 'rez',
     look: { kind: 'human', wings: '#ffffff', body: '#f5f0e1', trim: '#ffd84a', skin: '#f1cfa8', weapon: 'flamesword', halo: true, glow: '#fff7c0', hair: '#f5d76e' } },
 
+  // ---- יצורים משודרגים ----
+  halberdier: { name: 'הלברדאי', up: true, tier: 1, hp: 10, atk: 6, def: 5, dmg: [2, 3], spd: 105, cd: 1.45, range: 0, size: 15, cost: { gold: 75 }, ability: 'brace',
+    look: { kind: 'human', body: '#2d5ea8', trim: '#f0c850', skin: '#e0b48a', helm: '#d8dde3', weapon: 'spear', armor: true } },
+  marksman: { name: 'צלף', up: true, tier: 2, hp: 10, atk: 6, def: 3, dmg: [2, 3], spd: 105, cd: 1.1, range: 380, proj: 'arrow', size: 15, cost: { gold: 150 }, ability: 'volley',
+    look: { kind: 'human', body: '#2f6a8a', trim: '#f0c850', skin: '#e0b48a', hood: '#1f4a6a', weapon: 'bow' } },
+  royalgriffin: { name: 'גריפון מלכותי', up: true, tier: 3, hp: 25, atk: 9, def: 9, dmg: [3, 6], spd: 190, cd: 1.25, range: 0, size: 23, fly: true, cost: { gold: 240 }, ability: 'dive',
+    look: { kind: 'griffin', body: '#d8a040', wing: '#fff0b8', head: '#ffffff' } },
+  crusader: { name: 'צלבן', up: true, tier: 4, hp: 35, atk: 12, def: 12, dmg: [7, 10], spd: 95, cd: 1.3, range: 0, size: 17, cost: { gold: 400 }, ability: 'shieldwall',
+    look: { kind: 'human', body: '#c5ccd4', trim: '#d83a2a', skin: '#e0b48a', helm: '#e8edf2', weapon: 'sword', shield: '#e8edf2', armor: true, cape: '#b8322a' } },
+  zealot: { name: 'קנאי', up: true, tier: 5, hp: 30, atk: 12, def: 10, dmg: [10, 12], spd: 100, cd: 1.8, range: 330, proj: 'holy', noMeleePenalty: true, size: 16, cost: { gold: 450 }, ability: 'prayer',
+    look: { kind: 'human', robe: true, body: '#f5ecd8', trim: '#e8b830', skin: '#e0b48a', weapon: 'staff', glow: '#ffe060', halo: true } },
+  champion: { name: 'אלוף', up: true, tier: 6, hp: 100, atk: 16, def: 16, dmg: [20, 25], spd: 210, cd: 1.6, range: 0, size: 28, cost: { gold: 1200 }, ability: 'charge',
+    look: { kind: 'rider', horse: '#2a2a30', body: '#d8dde3', trim: '#e8b830', skin: '#e0b48a', helm: '#f0f3f6', weapon: 'lance' } },
+  archangel: { name: 'ארכי-מלאך', up: true, tier: 7, hp: 250, atk: 30, def: 30, dmg: [50, 50], spd: 190, cd: 1.4, range: 0, size: 26, fly: true, cost: { gold: 5000, gems: 3 }, ability: 'rez',
+    look: { kind: 'human', wings: '#fff4c8', body: '#fff8e6', trim: '#ff9a2a', skin: '#f1cfa8', weapon: 'flamesword', halo: true, glow: '#ffd060', hair: '#ffcf50', armor: true } },
+  // ---- גיבור אויב ----
+  necro: { name: 'נקרומנסר', ehero: true, hp: 120, atk: 4, def: 4, dmg: [6, 12], spd: 100, cd: 1.8, range: 260, proj: 'death', size: 17, undead: true,
+    look: { kind: 'human', robe: true, body: '#2a1f3a', trim: '#9a6aff', skin: '#c8c0d8', hood: '#1a1228', weapon: 'staff', glow: '#b07aff' } },
   // ---- ניטרליים ----
   goblin: { name: 'גובלין', hp: 5, atk: 4, def: 2, dmg: [1, 2], spd: 110, cd: 1.3, range: 0, size: 13, look: { kind: 'human', small: true, skin: '#7fae4f', body: '#6b4a2b', weapon: 'club', ears: true } },
   wolf: { name: 'זאב', hp: 12, atk: 6, def: 3, dmg: [2, 4], spd: 170, cd: 1.2, range: 0, size: 17, ability: 'howl', look: { kind: 'wolf', body: '#6e6e78', belly: '#a9a9b2' } },
@@ -37,6 +55,8 @@ const UNITS = {
     look: { kind: 'human', big: true, body: '#1a1420', trim: '#c01535', skin: '#c9c0d0', weapon: 'flamesword', cape: '#3a0a14', glow: '#ff3050', crown: true, helm: '#2a2430' } },
 };
 const PLAYER_UNITS = ['pikeman', 'archer', 'griffin', 'swordsman', 'monk', 'cavalier', 'angel'];
+const UPGRADE = { pikeman: 'halberdier', archer: 'marksman', griffin: 'royalgriffin', swordsman: 'crusader', monk: 'zealot', cavalier: 'champion', angel: 'archangel' };
+const BASE_OF = Object.fromEntries(Object.entries(UPGRADE).map(([a, b]) => [b, a]));
 
 const ABILITIES = {
   brace: { name: 'חומת חניתות', icon: '🛡️', target: 'self', cd: 20, dur: 8, desc: '+6 הגנה ופוגע בחזרה בתוקפים בתגרה' },
@@ -105,8 +125,16 @@ const BUILDINGS = {
   dw5: { name: 'מנזר', icon: '⛪', unit: 'monk', cost: { gold: 3000, wood: 5, ore: 5, crystal: 2, gems: 2 }, req: ['dw4', 'guild1'], desc: 'מגייס נזירים' },
   dw6: { name: 'מגרש האימונים', icon: '🐎', unit: 'cavalier', cost: { gold: 5000, wood: 10 }, req: ['dw4', 'fort'], desc: 'מגייס פרשים' },
   dw7: { name: 'שער התהילה', icon: '👼', unit: 'angel', cost: { gold: 15000, ore: 10, crystal: 6, gems: 6 }, req: ['dw5', 'townhall'], desc: 'מזמן מלאכים' },
+  up1: { name: 'משמר מבוצר', icon: '⬆️', upg: 'pikeman', cost: { gold: 1000, ore: 5 }, req: ['dw1'], desc: 'שדרוג: חנית-אי ← הלברדאי' },
+  up2: { name: 'מגדל הצלפים', icon: '⬆️', upg: 'archer', cost: { gold: 1000, wood: 5, ore: 5 }, req: ['dw2'], desc: 'שדרוג: קשת ← צלף' },
+  up3: { name: 'קן מלכותי', icon: '⬆️', upg: 'griffin', cost: { gold: 1000, ore: 5 }, req: ['dw3'], desc: 'שדרוג: גריפון ← גריפון מלכותי' },
+  up4: { name: 'אולם הצלבנים', icon: '⬆️', upg: 'swordsman', cost: { gold: 1500, wood: 5, ore: 5, crystal: 2 }, req: ['dw4', 'fort'], desc: 'שדרוג: אביר חרב ← צלבן' },
+  up5: { name: 'קתדרלה', icon: '⬆️', upg: 'monk', cost: { gold: 2000, wood: 5, ore: 5, crystal: 2, gems: 2 }, req: ['dw5'], desc: 'שדרוג: נזיר ← קנאי' },
+  up6: { name: 'זירת האלופים', icon: '⬆️', upg: 'cavalier', cost: { gold: 4000, wood: 10 }, req: ['dw6'], desc: 'שדרוג: פרש ← אלוף' },
+  up7: { name: 'שער הנצח', icon: '⬆️', upg: 'angel', cost: { gold: 12000, ore: 10, crystal: 6, gems: 6 }, req: ['dw7', 'cityhall'], desc: 'שדרוג: מלאך ← ארכי-מלאך' },
+  tower: { name: 'מגדלי חצים', icon: '🗼', cost: { gold: 2500, ore: 10 }, req: ['fort'], desc: 'במצור: שני מגדלים יורים חצים באויב' },
 };
-const BUILD_ORDER = ['hall', 'townhall', 'cityhall', 'fort', 'market', 'guild1', 'guild2', 'guild3', 'dw1', 'dw2', 'dw3', 'dw4', 'dw5', 'dw6', 'dw7'];
+const BUILD_ORDER = ['hall', 'townhall', 'cityhall', 'fort', 'tower', 'market', 'guild1', 'guild2', 'guild3', 'dw1', 'up1', 'dw2', 'up2', 'dw3', 'up3', 'dw4', 'up4', 'dw5', 'up5', 'dw6', 'up6', 'dw7', 'up7'];
 
 const WEEK_NAMES = ['שבוע הגריפון', 'שבוע הצפרדע', 'שבוע הזאב', 'שבוע החנית', 'שבוע הירח', 'שבוע הדרקון', 'שבוע הענק', 'שבוע הפרפר', 'שבוע הנמייה'];
 

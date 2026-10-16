@@ -54,14 +54,14 @@ function renderTownTab() {
   } else if (TV.tab === 'recruit') {
     const dw = BUILD_ORDER.filter((id) => BUILDINGS[id].unit);
     el.innerHTML = '<div class="recruit-list">' + dw.map((id) => {
-      const B = BUILDINGS[id], ut = B.unit, U = UNITS[ut];
+      const B = BUILDINGS[id], base = B.unit, ut = isUpgraded(base) ? UPGRADE[base] : base, U = UNITS[ut];
       const built = T.built.includes(id);
-      const av = T.avail[ut] || 0;
+      const av = T.avail[base] || 0;
       const maxAff = Math.min(av, ...Object.keys(U.cost).map((k) => Math.floor(G.res[k] / U.cost[k])));
       return `<div class="rcard ${built ? '' : 'locked'}">
         <img src="${unitIcon(ut, 64)}">
         <div class="rinfo">
-          <div class="rname">${U.name} <small>דרגה ${U.tier}</small></div>
+          <div class="rname">${U.name} <small>דרגה ${U.tier}${U.up ? ' · ⬆ משודרג' : ''}</small></div>
           <div class="rstats">❤️${U.hp} ⚔️${U.atk} 🛡️${U.def} 💥${U.dmg[0]}-${U.dmg[1]} ${U.range ? '🏹' : ''}${U.fly ? '🪽' : ''}</div>
           <div class="rstats">${ABILITIES[U.ability] ? ABILITIES[U.ability].icon + ' ' + ABILITIES[U.ability].name : ''}</div>
           <div class="rcost">${costStr(U.cost)} ליחידה</div>
@@ -96,7 +96,12 @@ function renderTownTab() {
     el.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => { const k = b.dataset.buy; G.res[k]++; G.res.gold -= rates[k][1]; Sound.play('coin'); renderTownTab(); });
   } else if (TV.tab === 'army') {
     const inTown = heroInTown();
-    const slot = (s, i, side) => s ? `<div class="aslot"><img src="${unitIcon(s.t, 52)}"><b>${s.n}</b><small>${UNITS[s.t].name}</small>${inTown ? `<button class="btn tiny" data-mv="${side}:${i}">${side === 'g' ? '⬆ לגיבור' : '⬇ לחיל המצב'}</button>` : ''}</div>` : '<div class="aslot empty"></div>';
+    const slot = (s, i, side) => {
+      if (!s) return '<div class="aslot empty"></div>';
+      const canUp = UPGRADE[s.t] && isUpgraded(s.t) && (side === 'g' || inTown);
+      const upCost = canUp ? upgradeCost(s.t, s.n) : null;
+      return `<div class="aslot"><img src="${unitIcon(s.t, 52)}"><b>${s.n}</b><small>${UNITS[s.t].name}</small>${inTown ? `<button class="btn tiny" data-mv="${side}:${i}">${side === 'g' ? '⬆ לגיבור' : '⬇ לחיל המצב'}</button>` : ''}${canUp ? `<button class="btn tiny up" data-up="${side}:${i}" ${canAfford(upCost) ? '' : 'disabled'} title="עלות: ${Object.keys(upCost).map((k) => upCost[k] + ' ' + RES_NAME[k]).join(', ')}">✨ שדרג</button>` : ''}</div>`;
+    };
     el.innerHTML = `<h4>צבא הגיבור ${inTown ? '' : '<small class="muted">(מחוץ לעיר)</small>'}</h4><div class="arow">${G.hero.army.map((s, i) => slot(s, i, 'h')).join('')}</div>
       <h4>חיל המצב</h4><div class="arow">${T.garrison.map((s, i) => slot(s, i, 'g')).join('')}</div>
       ${inTown ? '<div class="center"><button class="btn primary" id="all-to-hero">⬆ העבר הכל לגיבור</button></div>' : ''}`;
@@ -104,6 +109,18 @@ function renderTownTab() {
       const [side, i] = b.dataset.mv.split(':');
       const from = side === 'g' ? T.garrison : G.hero.army, to = side === 'g' ? G.hero.army : T.garrison;
       if (moveStack(from, +i, to)) Sound.play('select'); else { Sound.play('error'); toast('אין מקום פנוי'); }
+      renderTownTab();
+    });
+    el.querySelectorAll('[data-up]').forEach((b) => b.onclick = () => {
+      const [side, i] = b.dataset.up.split(':');
+      const arr = side === 'g' ? T.garrison : G.hero.army; const st = arr[+i];
+      const cost = upgradeCost(st.t, st.n);
+      if (!canAfford(cost)) { Sound.play('error'); return; }
+      pay(cost); const from = UNITS[st.t].name; st.t = UPGRADE[st.t];
+      // איחוד עם ערימה משודרגת קיימת
+      const j = arr.findIndex((x, k) => x && k !== +i && x.t === st.t);
+      if (j >= 0) { arr[j].n += st.n; arr[+i] = null; }
+      Sound.play('levelup'); toast(`✨ ${from} שודרגו ל${UNITS[UPGRADE[BASE_OF[st.t]]].name}!`);
       renderTownTab();
     });
     const all = $('#all-to-hero');
@@ -127,16 +144,22 @@ function addToArmy(arr, t, n) {
   if (arr[j]) arr[j].n += n; else arr[j] = { t, n };
   return true;
 }
+function isUpgraded(base) { const id = Object.keys(BUILDINGS).find((k) => BUILDINGS[k].upg === base); return !!id && G.town.built.includes(id); }
+function upgradeCost(t, n) {
+  const a = UNITS[t].cost, b = UNITS[UPGRADE[t]].cost, c = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) { const d = ((b[k] || 0) - (a[k] || 0)) * n; if (d > 0) c[k] = d; }
+  return c;
+}
 function recruit(ut, n) {
-  const U = UNITS[ut];
-  n = Math.min(n, G.town.avail[ut] || 0);
+  const U = UNITS[ut], base = BASE_OF[ut] || ut;
+  n = Math.min(n, G.town.avail[base] || 0);
   if (n <= 0 || !canAfford(U.cost, n)) { Sound.play('error'); return; }
   const target = heroInTown() ? G.hero.army : G.town.garrison;
   if (!addToArmy(target, ut, n)) {
     if (target === G.hero.army && addToArmy(G.town.garrison, ut, n)) toast('צבא הגיבור מלא — היחידות נשלחו לחיל המצב');
     else { Sound.play('error'); toast('אין מקום פנוי בצבא'); return; }
   }
-  pay(U.cost, n); G.town.avail[ut] -= n;
+  pay(U.cost, n); G.town.avail[base] -= n;
   Sound.play('recruit');
   toast(`⚔️ גויסו ${n} ${U.name}`);
   TV.marchers = (TV.marchers || []).concat(Array.from({ length: Math.min(6, n) }, (_, k) => ({ t: ut, x: -40 - k * 30, life: 0 })));
@@ -237,6 +260,14 @@ function townDraw(c, t) {
     }
     f(x, y);
     c.restore();
+    // דגל זהב מעל משכנות משודרגים
+    const upId = BUILDINGS[id] && BUILDINGS[id].unit ? Object.keys(BUILDINGS).find((k) => BUILDINGS[k].upg === BUILDINGS[id].unit) : null;
+    if (upId && built.includes(upId)) {
+      const fx = x + 50, fy = y - 40;
+      glow(c, fx, fy - 40, 40, '#ffd060', 0.35 + Math.sin(t * 3 + x) * 0.1);
+      drawFlag(c, fx, fy, '#e8b830', t + x, 50);
+      c.font = '20px serif'; c.textAlign = 'center'; c.fillText('✨', fx + 8, fy - 62);
+    }
   }
   // צועדים (מגויסים חדשים)
   if (TV.marchers) for (const m of TV.marchers) drawFigure(c, UNITS[m.t].look, m.x, 840, 2.2, { t, walk: m.life * 10, moving: true, atk: -1, face: 1, fly: UNITS[m.t].fly });
@@ -326,6 +357,11 @@ function drawWalls(c, x, y, t) {
   for (let i = 0; i < 50; i++) c.fillRect(x - 600 + i * 24, y - 70, 14, 14);
   c.fillStyle = '#3a2618'; c.beginPath(); c.moveTo(x - 40, y); c.lineTo(x - 40, y - 30); c.arc(x, y - 30, 40, Math.PI, 0); c.lineTo(x + 40, y); c.fill();
   for (const dx of [-80, 80, -520, 520]) { wallBox(c, x + dx, y, 56, 120, '#cfc3a8'); roof(c, x + dx, y - 120, 56, 50, '#3b6fb6'); }
+  if (G.town.built.includes('tower')) for (const dx of [-300, 300]) {
+    wallBox(c, x + dx, y, 70, 200, '#bfb29a'); for (let i = 0; i < 4; i++) c.fillRect(x + dx - 35 + i * 20, y - 214, 12, 14);
+    c.fillStyle = '#1a1008'; c.fillRect(x + dx - 4, y - 150, 8, 20);
+    drawFlag(c, x + dx, y - 214, '#2f6fd6', t + dx, 34);
+  }
 }
 function drawTraining(c, x, y, t) {
   c.strokeStyle = '#7a5530'; c.lineWidth = 4;

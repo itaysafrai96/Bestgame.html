@@ -11,13 +11,15 @@ function startBattle(opts) {
     killedXP: 0, uiT: 0, boss: !!opts.boss, summoned: false, result: null,
   });
   FX.reset();
-  B.bg = renderBattleBG(opts.terrain, opts.boss);
+  B.bg = renderBattleBG(opts.terrain, opts.boss, opts.siege);
   genObstacles(opts.terrain, opts.boss);
   const fortDef = opts.siege && G.town.built.includes('fort') ? 3 : 0;
   B.bonus = opts.hero ? { atk: heroStat('atk'), def: heroStat('def') + fortDef } : { atk: 0, def: fortDef };
   // צד השחקן
   const pl = [];
-  opts.army.forEach((s, i) => { if (s && s.n > 0) pl.push(makeUnit(s.t, s.n, 0, i)); });
+  for (const arr of [opts.army, opts.army2]) {
+    if (arr) arr.forEach((s, i) => { if (s && s.n > 0) { const u = makeUnit(s.t, s.n, 0, i); u.src = arr; pl.push(u); } });
+  }
   if (opts.hero) pl.push(makeHeroUnit(opts.hero));
   // צד האויב — ערימות ניטרליות מתפצלות לקבוצות (כמו ב-Heroes 3)
   const en = [];
@@ -31,7 +33,19 @@ function startBattle(opts) {
       if (n > 0) en.push(makeUnit(s.t, n, 1, -1));
     }
   }
+  // גיבור אויב (נקרומנסר)
+  B.ebonus = { atk: 0, def: 0 };
+  if (opts.ehero) {
+    const L = opts.ehero.level;
+    const nu = makeUnit('necro', 1, 1, -1);
+    nu.U = { ...UNITS.necro, hp: 120 + L * 45, dmg: [6 + L * 2, 12 + L * 3] };
+    Object.assign(nu, { hpMax: nu.U.hp, hpTop: nu.U.hp, isEHero: true, name: opts.ehero.name, spellT: 3, elvl: L });
+    B.ebonus = { atk: L, def: L };
+    en.push(nu);
+  }
   placeSide(pl, 0); placeSide(en, 1);
+  // מצור: חומות ומגדלי חצים
+  B.towers = opts.siege && G.town.built.includes('tower') ? [{ x: 62, top: 150, cd: 1 }, { x: 62, top: BH - 150, cd: 2 }] : [];
   B.units = pl.concat(en);
   setScreen('battle');
   buildBattleUI();
@@ -88,7 +102,7 @@ function genObstacles(terrain, boss) {
     B.obstacles.push({ x, y, kind, r: kind === 'rock' ? rand(22, 32) : kind === 'pillar' ? 18 : 16, s: rand(0.9, 1.3) });
   }
 }
-function renderBattleBG(terrain, boss) {
+function renderBattleBG(terrain, boss, siege) {
   const cv = document.createElement('canvas'); cv.width = BW; cv.height = BH;
   const c = cv.getContext('2d');
   const pal = boss ? ['#2a1e22', '#3a2a2c', '#4a2420'] : {
@@ -122,6 +136,7 @@ function renderBattleBG(terrain, boss) {
   c.lineTo(BW, 0); c.fill();
   if (!boss && terrain !== 3) for (let x = 10; x < BW; x += rand(22, 40)) drawTree(c, x, 70 + rand(-6, 8), rand(1.1, 1.6), terrain === 4 ? 'snowpine' : (terrain === 5 || terrain === 7) ? 'dead' : Math.random() < 0.5 ? 'pine' : 'oak');
   if (boss) { for (let x = 30; x < BW; x += 160) { c.fillStyle = '#2a2228'; c.fillRect(x, 10, 40, 60); c.fillStyle = '#ff3050'; c.fillRect(x + 16, 30, 8, 10); glow(c, x + 20, 35, 20, '#ff3050', 0.5); } }
+  if (siege) drawSiegeWall(c, G.town.built.includes('fort'), G.town.built.includes('tower'));
   const fog = c.createLinearGradient(0, 40, 0, 140); fog.addColorStop(0, 'rgba(220,230,255,.25)'); fog.addColorStop(1, 'rgba(220,230,255,0)');
   c.fillStyle = fog; c.fillRect(0, 40, BW, 100);
   return cv;
@@ -131,8 +146,8 @@ function renderBattleBG(terrain, boss) {
 const alive = (u) => !u.dead;
 function foes(u) { return B.units.filter((e) => e.side !== u.side && !e.dead); }
 function friends(u) { return B.units.filter((e) => e.side === u.side && !e.dead); }
-function atkOf(u) { return u.U.atk + (u.side === 0 ? B.bonus.atk : 0); }
-function defOf(u) { return u.U.def + (u.side === 0 ? B.bonus.def : 0) + (u.buffs.stone ? 8 : 0) + (u.buffs.brace ? 6 : 0); }
+function atkOf(u) { return u.U.atk + (u.side === 0 ? B.bonus.atk : B.ebonus.atk); }
+function defOf(u) { return u.U.def + (u.side === 0 ? B.bonus.def : B.ebonus.def) + (u.buffs.stone ? 8 : 0) + (u.buffs.brace ? 6 : 0); }
 function spdMult(u) { let m = 1; if (u.buffs.haste) m *= 1.5; if (u.buffs.slow) m *= 0.5; if (u.buffs.rush) m *= 2.6; return m; }
 function atkSpdMult(u) {
   let m = 1; if (u.buffs.haste) m *= 1.5; if (u.buffs.slow) m *= 0.5; if (u.buffs.frenzy) m *= 1.4;
@@ -158,6 +173,7 @@ function battleUpdate(rdt) {
   separate();
   updateProjs(dt);
   updateTele(dt);
+  updateTowers(dt);
   updateFX(dt);
   if (!B.over) {
     const a0 = B.units.some((u) => u.side === 0 && !u.dead), a1 = B.units.some((u) => u.side === 1 && !u.dead);
@@ -206,6 +222,7 @@ function think(u, dt) {
   if (u.side === 1) {
     if (u.U.ability && u.abCd <= 0) aiAbility(u);
     if (u.U.boss && !B.summoned && totalHp(u) < u.hpMax * 0.5) summonMinions(u);
+    if (u.isEHero) { u.spellT -= dt; if (u.spellT <= 0) { u.spellT = rand(5, 8); enemyHeroCast(u); } }
     if (u.retarget <= 0 || !u.target || u.target.dead) { u.retarget = rand(1.2, 2.2); u.target = pickTarget(u); }
   } else if (B.ai && !u.order) {
     if (u.retarget <= 0 || !u.target || u.target.dead) { u.retarget = rand(1.2, 2); u.target = pickTarget(u); }
@@ -315,7 +332,7 @@ function resolveAttack(a, t, o = {}) {
   dmg *= atk >= def ? Math.min(3, 1 + 0.05 * (atk - def)) : Math.max(0.3, 1 - 0.025 * (def - atk));
   if (side0 && B.opts.hero) dmg *= 1 + (o.ranged ? 0.12 * skillLvl('archery') : 0.1 * skillLvl('offense'));
   if (!side0 && B.opts.hero) dmg *= 1 - 0.06 * skillLvl('armorer');
-  if (o.ranged && foes(a).some((e) => dist(e.x, e.y, a.x, a.y) < a.r + e.r + 12)) dmg *= 0.5;
+  if (o.ranged && !a.U.noMeleePenalty && foes(a).some((e) => dist(e.x, e.y, a.x, a.y) < a.r + e.r + 12)) dmg *= 0.5;
   if (o.mult) dmg *= o.mult;
   if (a.nextMult > 1) { dmg *= a.nextMult; a.nextMult = 1; crit = true; }
   if (crit) dmg *= 2;
@@ -358,6 +375,7 @@ function kill(u, src) {
   burst(u.x, u.y, 25, { color: ['#3a3030', '#6a6060'], shape: 'smoke', sp: 60, size: 10, grow: 12, g: -20, life: 1.2, z: 10 });
   if (u.side === 1) B.killedXP += u.n0 * u.hpMax * (u.U.boss ? 3 : 1);
   if (u.isHero) { logLine(`${u.name} נפל! הצבא ממשיך להילחם...`, '#ff7070'); }
+  if (u.isEHero) { logLine(`💀 ${u.name} הנקרומנסר הובס! הקסם האפל נחלש.`, '#ffd36b'); B.ebonus = { atk: 0, def: 0 }; FX.flash = 0.5; FX.flashColor = '#b07aff'; }
   if (u.U.boss) { FX.flash = 1; FX.flashColor = '#ff3050'; FX.shake = 20; for (const e of B.units) if (e.side === 1 && !e.dead) { e.n = 0; kill(e, u); } }
 }
 function healUnit(u, amt, raise) {
@@ -580,12 +598,11 @@ function endBattle() {
   const victory = B.result === 'victory';
   const H = G.hero;
   const lost = [];
-  const army = B.opts.army;
   for (const u of B.units) {
     if (u.side !== 0 || u.isHero || u.slot < 0) continue;
     const diff = u.n0 - u.n;
     if (diff > 0) lost.push(`${diff} ${u.name}`);
-    army[u.slot] = u.n > 0 ? { t: u.t, n: u.n } : null;
+    u.src[u.slot] = u.n > 0 ? { t: u.t, n: u.n } : null;
   }
   if (victory) {
     Sound.play('victory');
@@ -602,7 +619,7 @@ function endBattle() {
 }
 function enemyLeft() {
   const m = {};
-  for (const u of B.units) if (u.side === 1 && !u.dead && !u.U.boss) m[u.t] = (m[u.t] || 0) + u.n;
+  for (const u of B.units) if (u.side === 1 && !u.dead && !u.U.boss && !u.isEHero) m[u.t] = (m[u.t] || 0) + u.n;
   return Object.keys(m).map((t) => ({ t, n: m[t] }));
 }
 function retreat() {
@@ -901,6 +918,7 @@ function battleDraw(c, t) {
   items.sort((a, b) => a[0] - b[0]);
   for (const [, f] of items) f();
   // קליעים
+  for (const tw of B.towers) drawBattleTower(c, tw, t);
   for (const p of B.projs) drawProj(c, p);
   drawFX(c);
   // פסי חיים ותוויות מעל הכל
@@ -991,4 +1009,85 @@ function drawProj(c, p) {
     if (p.kind === 'magic') { c.rotate(a); c.fillStyle = rgba(col, 0.6); c.beginPath(); c.moveTo(6, 0); c.lineTo(-18, -3); c.lineTo(-18, 3); c.fill(); }
   }
   c.restore();
+}
+
+// ---------- גיבור אויב: לחשים אפלים ----------
+function enemyHeroCast(u) {
+  const L = u.elvl || 1;
+  const fs = foes(u); if (!fs.length) return;
+  const fallen = B.units.filter((e) => e.side === 1 && e.dead && e.U.undead && !e.U.boss && !e.isEHero && e.deadT >= 1);
+  const opts = ['bolt', 'bolt', 'slow'];
+  if (fallen.length || B.units.some((e) => e.side === 1 && !e.dead && e.U.undead && e.n < e.n0 && !e.isEHero)) opts.push('raise', 'raise');
+  const kind = pick(opts);
+  const col = kind === 'raise' ? '#7cff9a' : '#b07aff';
+  u.cast = { t: 0, dur: 0.7, color: col, fn: () => {
+    if (u.dead) return;
+    if (kind === 'bolt') {
+      const tg = pick(fs); if (tg.dead) return;
+      Sound.play('magic');
+      spawnProj(u, tg, 'death', () => { applyDamage(tg, 18 + L * 14, u, { magic: true, silent: true }); logLine(`☠ ${u.name} מטיל חץ מוות על ${tg.name}`, '#d0a0ff'); burst(tg.x, tg.y, 18, { color: ['#b07aff', '#2a1a3a'], add: true, z: 24 * FIG, sp: 160 }); });
+    } else if (kind === 'slow') {
+      const tg = fs.filter((e) => !e.buffs.slow).sort((a, b) => totalHp(b) - totalHp(a))[0] || pick(fs);
+      tg.buffs.slow = 8; Sound.play('debuff');
+      ring(tg.x, tg.y, 50, 8, '#b08aff', 0.6);
+      floatText(tg.x, chestY(tg) - 20, 'קללת האטה', '#c8a8ff', 15);
+      logLine(`☠ ${u.name} מקלל את ${tg.name} באטיות`, '#d0a0ff');
+    } else {
+      const tg = fallen.length ? pick(fallen) : B.units.filter((e) => e.side === 1 && !e.dead && e.U.undead && e.n < e.n0 && !e.isEHero)[0];
+      if (!tg) return;
+      const raised = healUnit(tg, 40 + L * 30, true);
+      Sound.play('roar');
+      bolt(jagged(u.x, chestY(u), tg.x, tg.y, 8, 14), '#7cff9a', 0.6, 3);
+      burst(tg.x, tg.y, 40, { color: ['#7cff9a', '#1a3a20', '#ffffff'], add: true, g: -60, sp: 80, z: 5, life: 1.2 });
+      floatText(tg.x, chestY(tg) - 20, `+${raised} ☠`, '#7cff9a', 18, { bold: true });
+      logLine(`☠ ${u.name} מקים מן המתים ${raised} ${tg.name}!`, '#7cff9a');
+    }
+  } };
+  Sound.play('cast');
+  ring(u.x, u.y, 4, 46, col, 0.6, 3);
+}
+
+// ---------- מצור: חומה ומגדלים ----------
+function drawSiegeWall(c, fort, towers) {
+  const x0 = 0, w = fort ? 46 : 30;
+  const g = c.createLinearGradient(x0, 0, x0 + w, 0); g.addColorStop(0, fort ? '#8f8471' : '#6b4a2b'); g.addColorStop(1, fort ? '#cfc3a8' : '#8a6a40');
+  c.fillStyle = g; c.fillRect(x0, 60, w, BH - 60);
+  c.fillStyle = fort ? '#e0d6bf' : '#a07a48';
+  for (let y = 70; y < BH; y += 26) c.fillRect(x0 + w, y, 10, 14);
+  if (fort) {
+    c.fillStyle = '#3a2618'; c.fillRect(x0, BH / 2 - 10, w + 4, 64);
+    c.strokeStyle = '#7a5530'; c.lineWidth = 2; for (let y = BH / 2 - 6; y < BH / 2 + 54; y += 10) { c.beginPath(); c.moveTo(x0, y); c.lineTo(x0 + w + 4, y); c.stroke(); }
+    for (const y of [BH / 2 - 30, BH / 2 + 74]) drawFlag(c, x0 + w - 6, y, '#2f6fd6', 1, 40);
+  }
+}
+function drawBattleTower(c, tw, t) {
+  const x = tw.x, y = tw.top;
+  ell(c, x, y + 40, 46, 14, 'rgba(0,0,0,.35)');
+  const g = c.createLinearGradient(x - 34, 0, x + 34, 0); g.addColorStop(0, '#e0d6bf'); g.addColorStop(1, '#8f8471');
+  c.fillStyle = g; c.fillRect(x - 32, y - 70, 64, 110);
+  c.fillStyle = '#e0d6bf'; for (let i = 0; i < 4; i++) c.fillRect(x - 34 + i * 19, y - 84, 12, 16);
+  c.fillStyle = '#1a1008'; c.fillRect(x + 4, y - 40, 8, 18);
+  drawFlag(c, x, y - 84, '#2f6fd6', t + x + y, 34);
+  // קשת על המגדל
+  drawFigure(c, UNITS.marksman.look, x, y - 66, 1.2, { t, walk: 0, moving: false, atk: tw.anim > 0 ? 1 - tw.anim : -1, face: 1, noShadow: true });
+}
+function updateTowers(dt) {
+  if (!B.towers.length) return;
+  const week = Math.floor(G.dayCount / 7);
+  for (const tw of B.towers) {
+    tw.cd -= dt; tw.anim = Math.max(0, (tw.anim || 0) - dt * 2);
+    if (tw.cd > 0) continue;
+    let best = null, bd = 900;
+    for (const e of B.units) if (e.side === 1 && !e.dead) { const d = dist(e.x, e.y, tw.x, tw.top); if (d < bd) { bd = d; best = e; } }
+    if (!best) continue;
+    tw.cd = 2.2; tw.anim = 1;
+    const from = { x: tw.x, y: tw.top - 66 + 24 * FIG + 18, face: 1, fly: false };
+    const tg = best;
+    Sound.play('arrow');
+    spawnProj(from, tg, 'arrow', () => {
+      const dmg = 20 + week * 8 + (G.town.built.includes('cityhall') ? 15 : 0);
+      const killed = applyDamage(tg, dmg, null, {});
+      logLine(`🗼 מגדל החצים פוגע ב-${tg.name}: ${dmg} נזק${killed ? `, ${killed} נהרגו` : ''}`, '#9cc8ff');
+    });
+  }
 }

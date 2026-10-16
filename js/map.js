@@ -625,11 +625,13 @@ function enemyTurn() {
     const k = weeks + 1;
     const army = [{ t: 'skeleton', n: 12 + k * 6 }, { t: 'zombie', n: 6 + k * 3 }, { t: 'ghost', n: 3 + k * 2 }];
     if (k >= 3) army.push({ t: 'lich', n: k * 2 }); if (k >= 4) army.push({ t: 'vampire', n: k * 2 }); if (k >= 6) army.push({ t: 'bonedragon', n: Math.floor(k / 3) });
-    en = { type: 'enemy', x: W.cit.x - 2, y: W.cit.y, id: 5000 + G.dayCount, army };
+    G.enemySpawns = (G.enemySpawns || 0) + 1;
+    const hero = { name: ['וראקס', 'מורגול', 'סאלת׳ה', 'קרוואן', 'נקסיס'][(G.enemySpawns - 1) % 5], level: G.enemySpawns + Math.floor(weeks / 2) };
+    en = { type: 'enemy', x: W.cit.x - 2, y: W.cit.y, id: 5000 + G.dayCount, army, hero };
     W.objects.push(en); G.enemyLast = G.dayCount;
     rebuildOcc();
     Sound.play('horn');
-    showModal({ title: '☠️ צבא המתים יוצא לדרך!', html: `<p>שערי המצודה האפלה נפתחו. צבא של מתים-חיים צועד לעבר העיר שלך!</p><p class="muted">הגן על העיר — אם תיפול, המערכה אבודה.</p>` });
+    showModal({ title: '☠️ צבא המתים יוצא לדרך!', html: `<p>שערי המצודה האפלה נפתחו. הנקרומנסר <b>${hero.name}</b> (רמה ${hero.level}) מוביל צבא של מתים-חיים לעבר העיר שלך!</p><p class="muted">בקרב הוא מטיל קללות, יורה חיצי מוות ומקים את חייליו מן המתים — הבס אותו ראשון!</p><p class="muted">הגן על העיר — אם תיפול, המערכה אבודה.</p>` });
     return;
   }
   if (!en) return;
@@ -669,7 +671,7 @@ function townSiege(en) {
     title: '🏰 המצור על העיר!', html: '<p>צבא המתים הגיע לשערי העיר. חיל המצב יוצא להגן עליה — בלי הגיבור!</p>',
     buttons: [{ label: '⚔️ להגנה!', cls: 'primary', fn: () => {
       startBattle({
-        army: G.town.garrison, hero: null, enemy: en.army.map((s) => ({ ...s })), terrain: 1, siege: true,
+        army: G.town.garrison, hero: null, enemy: en.army.map((s) => ({ ...s })), terrain: 1, siege: true, ehero: en.hero,
         title: 'הגנה על העיר',
         onEnd: (res) => {
           if (res.victory) { removeObj(en); toast('🏆 חיל המצב הדף את המתים!'); setScreen('map'); }
@@ -688,12 +690,14 @@ function mapBattle(o, opts = {}) {
   Sound.play('horn');
   const go = () => {
     startBattle({
-      army: G.hero.army, hero: G.hero, enemy: o.army.map((s) => ({ ...s })), terrain: tile, boss: isBoss,
+      army: G.hero.army, hero: G.hero, enemy: o.army.map((s) => ({ ...s })), terrain: opts.siege ? 1 : tile, boss: isBoss,
+      siege: !!opts.siege, army2: opts.siege ? G.town.garrison : null, ehero: o.hero,
       title: isBoss ? 'הקרב על המצודה האפלה' : o.type === 'enemy' ? 'צבא המתים' : 'קרב',
       onEnd: (res) => {
         if (res.victory) {
           if (isBoss) { removeObj(o); setScreen('map'); winGame(); return; }
           removeObj(o); setScreen('map'); gainXP(res.xp);
+          if (o.hero) toast(`💀 הנקרומנסר ${o.hero.name} הובס!`, 3500);
         } else if (res.retreat) {
           G.hero.army = [null, null, null, null, null, null, null];
           G.hero.x = G.world.town.x; G.hero.y = G.world.town.y; G.hero.mp = 0;
@@ -809,7 +813,8 @@ function drawObj(c, o, t) {
       const s = o.army[0], L = UNITS[s.t].look;
       const big = L.kind === 'dragon' ? 0.6 : L.big ? 0.85 : 1.05;
       if (o.type === 'enemy') { glow(c, x, y - 16, 40, '#ff2040', 0.3); }
-      drawFigure(c, L, x, y - 4, big, { t: t + o.id, walk: 0, moving: false, atk: -1, face: -1, fly: false, seed: o.id });
+      if (o.type === 'enemy' && o.hero) drawMapHero(c, x, y - 2, -1, 0, false, t, '#5a1a7a', MAP_NECRO_LOOK);
+      else drawFigure(c, L, x, y - 4, big, { t: t + o.id, walk: 0, moving: false, atk: -1, face: -1, fly: false, seed: o.id });
       if (o.army.length > 1 || s.n > 1) {
         const n = o.army.reduce((a, b) => a + b.n, 0);
         c.font = '700 11px Heebo'; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -861,7 +866,7 @@ function mapMouseMove(x, y) {
     if (o.type === 'monster' || o.type === 'enemy' || o.type === 'citadel') {
       const ratio = armyPower(o.army) / Math.max(1, armyPower(G.hero.army, heroStat('atk') + heroStat('def')) + G.hero.level * 60);
       const danger = ratio < 0.4 ? ['קלה', '#7fd47f'] : ratio < 0.8 ? ['בינונית', '#ffd75e'] : ratio < 1.3 ? ['קשה', '#ff9b4a'] : ['קטלנית', '#ff4d4d'];
-      tip = `<b>${o.type === 'citadel' ? 'המצודה האפלה' : o.type === 'enemy' ? 'צבא המתים' : sizeWord(o.army[0].n) + ' ' + UNITS[o.army[0].t].name}</b><br>` +
+      tip = `<b>${o.type === 'citadel' ? 'המצודה האפלה' : o.type === 'enemy' ? 'צבא המתים' + (o.hero ? ` — ${o.hero.name} (רמה ${o.hero.level})` : '') : sizeWord(o.army[0].n) + ' ' + UNITS[o.army[0].t].name}</b><br>` +
         o.army.map((s) => `${o.type === 'monster' ? sizeWord(s.n) : s.n} ${UNITS[s.t].name}`).join('<br>') + `<br>סכנה: <b style="color:${danger[1]}">${danger[0]}</b>`;
     } else if (o.type === 'mine') tip = `<b>${mineName(o.res)}</b><br>${o.owner ? '🚩 בשליטתך' : 'לא נכבש'}`;
     else if (o.type === 'res') tip = `<b>${RES_NAME[o.res]}</b> ${RES_ICON[o.res]}`;

@@ -337,8 +337,10 @@ function drawBoneWing(c, x, y, col, ang, s, dk) {
 }
 
 // ---- גיבור במפה (על סוס עם דגל) ----
-function drawMapHero(c, x, y, face, walk, moving, t, flagColor = '#2f6fd6') {
-  drawFigure(c, { kind: 'rider', horse: '#7a4a2a', body: '#3355a0', trim: '#e8c04a', skin: '#e0b48a', helm: '#d8dde3', weapon: 'lance', cape: '#2f6fd6', armor: true }, x, y, 1.05, { t, walk, moving, atk: -1, face, seed: 1 });
+const MAP_HERO_LOOK = { kind: 'rider', horse: '#7a4a2a', body: '#3355a0', trim: '#e8c04a', skin: '#e0b48a', helm: '#d8dde3', weapon: 'lance', cape: '#2f6fd6', armor: true };
+const MAP_NECRO_LOOK = { kind: 'rider', horse: '#1a1418', body: '#2a1f3a', trim: '#9a6aff', skin: '#c8c0d8', hood: '#1a1228', weapon: 'staff', cape: '#3a1a4a', glow: '#b07aff' };
+function drawMapHero(c, x, y, face, walk, moving, t, flagColor = '#2f6fd6', look = MAP_HERO_LOOK) {
+  drawFigure(c, look, x, y, 1.05, { t, walk, moving, atk: -1, face, seed: 1 });
   // דגל
   const fx = x - 10 * face, fy = y - 62;
   c.strokeStyle = '#5a3d22'; c.lineWidth = 2; c.beginPath(); c.moveTo(fx, y - 22); c.lineTo(fx, fy); c.stroke();

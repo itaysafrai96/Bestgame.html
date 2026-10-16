@@ -110,7 +110,7 @@ function initMapState() {
 function serialize() {
   const objects = G.world.objects.map((o) => { const c = { ...o }; delete c.px; delete c.py; return c; });
   const hero = { ...G.hero }; delete hero.px; delete hero.py; delete hero.walk;
-  return JSON.stringify({ v: 1, seed: G.seed, objects, fog: Array.from(G.fog), res: G.res, day: G.day, week: G.week, month: G.month, dayCount: G.dayCount, enemyLast: G.enemyLast, tutorialSeen: G.tutorialSeen, hero, town: G.town });
+  return JSON.stringify({ v: 1, seed: G.seed, objects, fog: Array.from(G.fog), res: G.res, day: G.day, week: G.week, month: G.month, dayCount: G.dayCount, enemyLast: G.enemyLast, enemySpawns: G.enemySpawns || 0, tutorialSeen: G.tutorialSeen, hero, town: G.town });
 }
 function deserialize(s) {
   const d = JSON.parse(s);
