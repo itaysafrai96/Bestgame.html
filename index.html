@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>גיבורי הכתר האבוד — Heroes of the Lost Crown</title>
+  <meta name="description" content="משחק אסטרטגיה בהשראת Heroes of Might and Magic 3 ו-5, עם קרבות בזמן אמת עם הפסקה בסגנון Baldur's Gate 2.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Frank+Ruhl+Libre:wght@500;700;900&family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-screen="intro">
+  <canvas id="game"></canvas>
+  <div id="intro-ui" class="screen-ui"></div>
+  <div id="title-ui" class="screen-ui"></div>
+  <div id="map-ui" class="screen-ui"></div>
+  <div id="town-ui" class="screen-ui"></div>
+  <div id="battle-ui" class="screen-ui"></div>
+  <div id="toasts"></div>
+  <div id="tip"></div>
+  <noscript>המשחק דורש JavaScript.</noscript>
+
+  <script src="js/util.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/draw.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/town.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
