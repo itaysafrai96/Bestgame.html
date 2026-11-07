@@ -33,7 +33,7 @@ h1{font-family:Rubik,Heebo,sans-serif;font-size:58px;font-weight:900;margin:10px
 /* top bar */
 .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
 .pill:focus-visible,.hub:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
-.pill{background:#ffffff14;border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-weight:700;font-size:14px;color:#fff}
+.pill{background:#ffffff14;border:1px solid var(--line);border-radius:999px;padding:7px 11px;font-weight:700;font-size:14px;color:#fff}
 button{font:inherit;border:0;cursor:pointer;color:#fff;font-weight:800;transition:transform .12s,filter .2s}
 button:active{transform:scale(.95)}
 .pill.pill-new{background:linear-gradient(135deg,#a855f7,#e64ba0);border-color:transparent}
@@ -103,6 +103,36 @@ button:active{transform:scale(.95)}
 .b-sub{background:#00000030;color:inherit}
 .sheet.bump .b-sub{color:#2a1300}
 
+/* review mode */
+.review{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.rv-head{padding-block:14px 10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:#1f1029}
+.rv-head>*{max-width:640px;margin-inline:auto}
+.rv-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rv-top h2{margin:0;font-size:21px;font-family:Rubik,Heebo,sans-serif}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
+.tab{padding:10px 6px;border-radius:12px;background:#ffffff12;font-size:15px}
+.tab small{display:block;font-weight:600;font-size:12px;opacity:.8}
+.tab.on{background:var(--c)}
+.rv-note{color:var(--muted);font-size:13.5px;margin:10px auto 0;text-align:right;line-height:1.5}
+.rv-list{flex:1;overflow:auto;padding-block:10px 150px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.rv-list>*{max-width:640px;margin-inline:auto}
+.rv-item{display:flex;gap:10px;align-items:center;padding:12px 12px 12px 8px;border-radius:14px;background:#ffffff0b;margin-bottom:8px;text-align:right}
+.rv-item p{margin:0;flex:1;min-width:0;font-size:16px;line-height:1.45}
+.rv-item .new{display:inline-block;font-size:11px;background:var(--gold);color:#2a1300;border-radius:999px;padding:1px 8px;margin-inline-start:6px;font-weight:800;vertical-align:2px}
+.rv-item button{flex:none;width:46px;height:46px;border-radius:12px;background:#ffffff14;font-size:20px}
+.rv-item.gone{background:#ef444418}
+.rv-item.gone p{text-decoration:line-through;opacity:.5}
+.rv-item.gone button{background:#ef444466}
+.rv-sep{color:var(--muted);font-size:13px;margin:18px auto 8px;text-align:right}
+.rv-foot{position:fixed;bottom:0;left:0;right:0;z-index:16;padding-block:24px calc(12px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:linear-gradient(transparent,var(--bg) 35%)}
+.rv-foot>*{max-width:640px;margin-inline:auto;display:block;width:100%}
+.rv-foot button{padding:15px;border-radius:16px;font-size:17px}
+.rv-foot button:disabled{opacity:.45}
+.rv-status{font-size:14px;color:var(--muted);text-align:center;min-height:20px;margin-bottom:8px}
+.dislike{display:block;margin:12px auto 0;background:none;color:inherit;opacity:.75;font-weight:700;font-size:14px;padding:6px 10px;border-radius:10px}
+.dislike:disabled{opacity:.6}
+
 /* settings */
 .panel{background:#22142c;border:1px solid var(--line);border-radius:24px;padding:18px;width:100%;max-width:520px;margin:12px;text-align:right;max-height:90vh;overflow:auto;animation:pop .35s}
 .panel h2{margin:0 0 12px;font-size:20px}
@@ -131,6 +161,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
 
   <div class="bar">
     <button class="pill" id="settingsBtn">⚙️ שחקנים</button>
+    <button class="pill" id="reviewBtn">📝 הרצה</button>
     <button class="pill pill-new" id="newBtn">🔄 משחק חדש</button>
     <button class="pill" id="muteBtn" aria-label="צלילים">🔊</button>
   </div>
@@ -174,6 +205,21 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     <div class="btns">
       <button class="b-main" id="nextBtn">סיבוב הבא 🎡</button>
     </div>
+    <button class="dislike hide" id="dislikeBtn">👎 לא אהבתי, להוריד מהמשחק</button>
+  </div>
+</div>
+
+<!-- review mode -->
+<div class="review hide" id="review" dir="rtl" role="dialog" aria-modal="true" aria-labelledby="rvTitle">
+  <div class="rv-head">
+    <div class="rv-top"><h2 id="rvTitle">📝 מצב הרצה</h2><button class="btn" id="rvClose">חזרה למשחק</button></div>
+    <div class="tabs" id="rvTabs"></div>
+    <p class="rv-note">עוברים על השאלות ולוחצים 👎 על מה שלא אהבתם. היא יוצאת מהמשחק מיד, ולחיצה נוספת מחזירה אותה. בסוף לוחצים על הכפתור למטה וכותבים שאלות חדשות במקום.</p>
+  </div>
+  <div class="rv-list" id="rvList"></div>
+  <div class="rv-foot">
+    <div class="rv-status" id="rvStatus" aria-live="polite"></div>
+    <button class="b-main" id="rvGen">✨ לכתוב שאלות חדשות במקום</button>
   </div>
 </div>
 
@@ -254,13 +300,53 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   // no repeats until every card of a category was used – remembered across reloads
   decks = store.get('decks', {});
   function drawFrom(key){
-    const list = D[key];
-    let dk = decks[key];
-    if (!dk || dk.n !== list.length || !dk.rem.length) dk = decks[key] = { n:list.length, rem:shuffle(list.map((_, i) => i)) };
-    const card = list[dk.rem.pop()];
+    const list = activeList(key);
+    const used = new Set((decks[key] && decks[key].used) || []);
+    let pool = list.filter(t => !used.has(t));
+    if (!pool.length){ used.clear(); pool = list.slice(); }
+    const card = pool[rnd() * pool.length | 0];
+    used.add(card); decks[key] = { used:[...used] };
     store.set('decks', decks);
     return card;
   }
+
+  // ---------- edits from review mode ----------
+  // Every 👎 is a "remove" record, every new card an "add" record. They live in the
+  // artifact's shared db when available (so Claude and other phones see them),
+  // otherwise in this browser.
+  const CAT_KEYS = ['truth', 'dare', 'secret'];
+  const hash = str => { let h = 5381; for (const ch of str) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0; return h.toString(36); };
+  const rmId = (cat, text) => 'r-' + cat + '-' + hash(text);
+  let edits = store.get('edits', {}), editsDb = null;
+  function activeList(cat){
+    const all = Object.values(edits);
+    const gone = new Set(all.filter(e => e.type === 'remove' && e.cat === cat).map(e => e.text));
+    const added = all.filter(e => e.type === 'add' && e.cat === cat).sort((a, b) => (a.ts || 0) - (b.ts || 0)).map(e => e.text);
+    return [...D[cat], ...added].filter(t => !gone.has(t));
+  }
+  async function putEdit(id, body){
+    edits = { ...edits, [id]: body };
+    if (!editsDb) store.set('edits', edits);
+    renderReview();
+    if (editsDb) await editsDb.collection('edits').doc(id).set(body);
+  }
+  async function dropEdit(id){
+    const next = { ...edits }; delete next[id]; edits = next;
+    if (!editsDb) store.set('edits', edits);
+    renderReview();
+    if (editsDb) await editsDb.collection('edits').doc(id).delete();
+  }
+  (async () => {
+    try {
+      const db = window.claude && await window.claude.use('db');
+      if (!db) return;
+      editsDb = db;
+      db.collection('edits').onSnapshot(snap => {
+        const m = {}; snap.docs.forEach(d => { m[d.id] = d.data(); });
+        edits = m; renderReview();
+      }, () => {});
+    } catch {}
+  })();
   const curPlayer = () => st.players.length ? st.players[st.turn % st.players.length] : null;
   function fill(text){
     const me = curPlayer();
@@ -569,8 +655,9 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
       save();
       return showResult(all ? 'bumpall' : 'bump', all ? 'באמפ לכולם!' : 'באמפ!', all ? '🍻🍻🍻' : '🍻', 0, `באמפ #${st.bumps}`, p);
     }
-    const { text, secs } = fill(drawFrom(cat));
-    current = { cat, secs };
+    const raw = drawFrom(cat);
+    const { text, secs } = fill(raw);
+    current = { cat, secs, raw };
     save();
     showResult(cat, CATS[cat].name, text, secs, '', p);
   }
@@ -582,6 +669,9 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     $('rWho').textContent = cls === 'bumpall' ? `באמפ מספר ${st.bumps} – כולם שותים!` : p ? `ל${p}` : '';
     $('rTxt').textContent = text;
     $('rTxt').classList.toggle('big', cls === 'bump' || cls === 'bumpall');
+    const canDislike = CAT_KEYS.includes(cls);
+    $('dislikeBtn').classList.toggle('hide', !canDislike);
+    $('dislikeBtn').disabled = false; $('dislikeBtn').textContent = '👎 לא אהבתי, להוריד מהמשחק';
     stopTimer();
     $('timerBox').classList.toggle('hide', !secs);
     $('clock').textContent = secs ? secs + 'ש׳' : ''; $('clock').classList.remove('done');
@@ -646,6 +736,103 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   }
   $('soundOpt').onchange = () => setSound($('soundOpt').checked);
   $('muteBtn').onclick = () => setSound(!st.sound);
+  let rvCat = 'truth';
+  function renderReview(){
+    if ($('review').classList.contains('hide')) return;
+    const all = Object.values(edits);
+    $('rvTabs').innerHTML = CAT_KEYS.map(k => {
+      const gone = all.filter(e => e.type === 'remove' && e.cat === k).length;
+      return `<button class="tab ${k === rvCat ? 'on' : ''}" data-k="${k}" style="--c:${CATS[k].color}">${CATS[k].name}<small>${activeList(k).length} בגלגל${gone ? ` · ${gone} 👎` : ''}</small></button>`;
+    }).join('');
+    const gone = new Set(all.filter(e => e.type === 'remove' && e.cat === rvCat).map(e => e.text));
+    const added = all.filter(e => e.type === 'add' && e.cat === rvCat).sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(e => e.text);
+    const row = (t, isNew) => `<div class="rv-item ${gone.has(t) ? 'gone' : ''}"><p>${esc(t.replace(/\{p\}/g, '‹שם›').replace(/\s*\[(\d+)\]\s*$/, ' · $1 שנ׳'))}${isNew ? '<span class="new">חדש</span>' : ''}</p>
+      <button data-t="${encodeURIComponent(t)}" aria-label="${gone.has(t) ? 'להחזיר' : 'להוריד'}">${gone.has(t) ? '↩️' : '👎'}</button></div>`;
+    $('rvList').innerHTML = (added.length ? `<div class="rv-sep">✨ חדשות (${added.length})</div>` + added.map(t => row(t, true)).join('') + '<div class="rv-sep">כל השאר</div>' : '')
+      + D[rvCat].map(t => row(t, false)).join('');
+    const pending = all.filter(e => e.type === 'remove' && !e.replaced).length;
+    if (!genBusy){
+      $('rvGen').disabled = !pending;
+      $('rvGen').textContent = pending ? `✨ לכתוב ${pending} שאלות חדשות במקום` : '✨ אין שאלות שמחכות להחלפה';
+    }
+  }
+  $('rvTabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (!b) return; rvCat = b.dataset.k; SFX.ui(); renderReview(); $('rvList').scrollTop = 0; });
+  $('rvList').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-t]'); if (!b) return;
+    const t = decodeURIComponent(b.dataset.t), id = rmId(rvCat, t);
+    try {
+      if (edits[id]) await dropEdit(id);
+      else { await putEdit(id, { type:'remove', cat:rvCat, text:t, replaced:false, ts:Date.now() }); SFX.ui(); }
+    } catch { $('rvStatus').textContent = 'לא הצלחתי לשמור. בדקו חיבור ונסו שוב.'; }
+  });
+  $('reviewBtn').onclick = () => { $('review').classList.remove('hide'); $('rvStatus').textContent = ''; SFX.ui(); renderReview(); };
+  $('rvClose').onclick = () => { $('review').classList.add('hide'); renderHUD(); };
+  $('dislikeBtn').onclick = async () => {
+    if (!current || !current.raw) return;
+    $('dislikeBtn').disabled = true; $('dislikeBtn').textContent = '✓ ירדה מהמשחק. אפשר להחליף אותה ב📝 הרצה';
+    try { await putEdit(rmId(current.cat, current.raw), { type:'remove', cat:current.cat, text:current.raw, replaced:false, ts:Date.now() }); } catch {}
+  };
+
+  // ask Claude for replacement cards in the same voice
+  let genBusy = false;
+  $('rvGen').onclick = async () => {
+    const pendingList = Object.entries(edits).filter(([, e]) => e.type === 'remove' && !e.replaced);
+    if (!pendingList.length || genBusy) return;
+    let sample = null;
+    try { sample = window.claude && await window.claude.use('sample'); } catch {}
+    if (!sample){
+      $('rvStatus').textContent = 'השאלות שסימנתם כבר ירדו מהמשחק. כדי לקבל חדשות, כתבו לClaude בצ׳אט "תחליף את מה שסימנתי".';
+      return;
+    }
+    const need = { truth:0, dare:0, secret:0 };
+    pendingList.forEach(([, e]) => need[e.cat]++);
+    const cats = CAT_KEYS.filter(k => need[k]);
+    const pick = (arr, n) => shuffle(arr.slice()).slice(0, n);
+    const prompt = [
+      'You write cards for "אמת או חובה · THE GANG", an Israeli party game in Hebrew for adults (18+), played by a group of friends who are drinking.',
+      'Write NEW cards in exactly the same voice as the liked examples: natural spoken Israeli Hebrew, the way a friend would text it, slang is fine.',
+      'Rules: address the player in the generic masculine (אתה). No slashes like את/ה. No long dashes. No parentheses. Emoji only rarely. Short, at most about 15 words.',
+      'Make them juicy and flirty, sexual is fine, but keep everything between consenting adults who are playing. Nothing about minors, nothing non-consensual, nothing that harms anyone.',
+      '{p} stands for another player\'s name. Attach Hebrew prefix letters directly to it, like ל{p}. Do not use he/she pronouns about {p}.',
+      'Dares may end with [N] to show an N-second timer. Secret cards are a topic phrase the player then tells about, with no verb at the start, like "הלילה הכי פרוע שהיה לך".',
+      'Do not repeat or paraphrase any existing card.',
+      '',
+      ...cats.map(k => [
+        `== ${k} (${CATS[k].name}) ==`,
+        'Liked examples:', ...pick(activeList(k), 15).map(t => '- ' + t),
+        'Rejected by the group, avoid cards like these:', ...pendingList.filter(([, e]) => e.cat === k).map(([, e]) => '- ' + e.text),
+        'All existing cards (do not repeat):', activeList(k).join(' | '),
+        `Write exactly ${need[k]} new ${k} card(s).`, ''
+      ].join('\n')),
+      'Reply with only a JSON object like {"truth": ["..."], "dare": ["..."], "secret": ["..."]} containing only the categories asked for.'
+    ].join('\n');
+
+    genBusy = true; $('rvGen').disabled = true; $('rvGen').textContent = '✍️ כותב שאלות חדשות…';
+    $('rvStatus').textContent = 'זה לוקח בערך חצי דקה';
+    try {
+      const res = await sample.json(prompt, { cache:false });
+      let added = 0;
+      for (const k of cats){
+        const arr = (res && Array.isArray(res[k]) ? res[k] : []).filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).slice(0, need[k]);
+        for (let i = 0; i < arr.length; i++){
+          await putEdit('a-' + k + '-' + hash(arr[i]), { type:'add', cat:k, text:arr[i], ts:Date.now() + i });
+          added++;
+        }
+        const done = pendingList.filter(([, e]) => e.cat === k).slice(0, arr.length);
+        for (const [id, e] of done) await putEdit(id, { ...e, replaced:true });
+      }
+      $('rvStatus').textContent = added ? `✨ נוספו ${added} שאלות חדשות. הן מסומנות "חדש" למעלה, ואפשר לתת גם להן 👎` : 'לא התקבלו שאלות. נסו שוב.';
+      if (added){ SFX.add(); rvCat = cats[0]; $('rvList').scrollTop = 0; }
+    } catch (e) {
+      const code = e && e.code;
+      $('rvStatus').textContent = code === 'not_granted' || code === 'sampling_disabled' ? 'בלי אישור לClaude אי אפשר לכתוב חדשות כאן. כתבו לי בצ׳אט "תחליף את מה שסימנתי".'
+        : code === 'rate_limited' ? 'יותר מדי בקשות כרגע. נסו שוב עוד כמה דקות.'
+        : code === 'cancelled' ? '' : 'משהו השתבש. נסו שוב.';
+    } finally {
+      genBusy = false; renderReview();
+    }
+  };
+
   function newGame(clearPlayers){
     Object.assign(st, { bumps:0, spins:0, turn:0, counts:{truth:0,dare:0,secret:0,bump:0,bumpall:0} });
     if (clearPlayers) st.players = [];
