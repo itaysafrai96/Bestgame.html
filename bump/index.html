@@ -103,6 +103,13 @@ button:active{transform:scale(.95)}
 .b-sub{background:#00000030;color:inherit}
 .sheet.bump .b-sub{color:#2a1300}
 
+/* secret topic picker */
+.topics{display:grid;gap:10px;margin-top:16px}
+.topic{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;background:#ffffff26;font-size:20px;text-align:right;border:2px solid #ffffff30;color:#fff}
+.topic .e{font-size:28px;line-height:1}
+.topic:hover{background:#ffffff38}
+.sheet.picking .btns,.sheet.picking .dislike{display:none}
+
 /* review mode */
 .review{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
 .rv-head{padding-block:14px 10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:#1f1029}
@@ -198,6 +205,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     <div class="cat" id="rCat"></div>
     <div class="who" id="rWho"></div>
     <div class="txt" id="rTxt"></div>
+    <div class="topics hide" id="topics"></div>
     <div class="timer hide" id="timerBox">
       <button class="btn b-sub" id="timerBtn">▶ טיימר</button>
       <span class="clock" id="clock"></span>
@@ -299,8 +307,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   // no repeats until every card of a category was used – remembered across reloads
   decks = store.get('decks', {});
-  function drawFrom(key){
-    const list = activeList(key);
+  function drawFrom(key, list = activeList(key)){
     const used = new Set((decks[key] && decks[key].used) || []);
     let pool = list.filter(t => !used.has(t));
     if (!pool.length){ used.clear(); pool = list.slice(); }
@@ -324,6 +331,14 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     const added = all.filter(e => e.type === 'add' && e.cat === cat).sort((a, b) => (a.ts || 0) - (b.ts || 0)).map(e => e.text);
     return [...D[cat], ...added].filter(t => !gone.has(t));
   }
+  const TOPICS = D.secretTopics;
+  const baseTopic = {}; TOPICS.forEach(t => t.items.forEach(x => { baseTopic[x] = t.id; }));
+  function topicOf(text){
+    if (baseTopic[text]) return baseTopic[text];
+    const e = Object.values(edits).find(e => e.type === 'add' && e.cat === 'secret' && e.text === text);
+    return (e && e.topic) || 'sex';
+  }
+  const secretsIn = id => activeList('secret').filter(t => topicOf(t) === id);
   async function putEdit(id, body){
     edits = { ...edits, [id]: body };
     if (!editsDb) store.set('edits', edits);
@@ -638,7 +653,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     if (e.target.matches('input')) return;
     const open = !$('resultOv').classList.contains('hide');
     if ((e.key === ' ' || e.key === 'Enter') && !open && $('setOv').classList.contains('hide')){ e.preventDefault(); spin(); }
-    else if (e.key === 'Enter' && open && !e.target.matches('button')){ e.preventDefault(); nextTurn(); }
+    else if (e.key === 'Enter' && open && !e.target.matches('button') && !$('sheet').classList.contains('picking')){ e.preventDefault(); nextTurn(); }
   });
 
   // ---------- result ----------
@@ -655,15 +670,43 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
       save();
       return showResult(all ? 'bumpall' : 'bump', all ? 'באמפ לכולם!' : 'באמפ!', all ? '🍻🍻🍻' : '🍻', 0, `באמפ #${st.bumps}`, p);
     }
+    if (cat === 'secret'){
+      // pick 3 different topics that still have cards
+      const open = TOPICS.filter(t => secretsIn(t.id).length);
+      const three = shuffle(open.slice()).slice(0, 3);
+      current = { cat, secs:0, raw:null };
+      save();
+      showResult('secret', 'סוד', 'על מה בא לך לספר?', 0, '', p);
+      $('sheet').classList.add('picking');
+      $('topics').innerHTML = three.map(t => `<button class="topic" data-id="${t.id}"><span class="e">${t.emoji}</span>${esc(t.name)}</button>`).join('');
+      $('topics').classList.remove('hide');
+      $('dislikeBtn').classList.add('hide');
+      setTimeout(() => { const f = $('topics').querySelector('button'); if (f) f.focus({ preventScroll:true }); }, 60);
+      return;
+    }
     const raw = drawFrom(cat);
     const { text, secs } = fill(raw);
     current = { cat, secs, raw };
     save();
     showResult(cat, CATS[cat].name, text, secs, '', p);
   }
+  $('topics').addEventListener('click', e => {
+    const b = e.target.closest('.topic'); if (!b) return;
+    const t = TOPICS.find(x => x.id === b.dataset.id);
+    const raw = drawFrom('secret:' + t.id, secretsIn(t.id));
+    current = { cat:'secret', secs:0, raw };
+    $('sheet').classList.remove('picking');
+    $('topics').classList.add('hide');
+    $('rNum').textContent = t.emoji + ' ' + t.name; $('rNum').classList.remove('hide');
+    $('rTxt').textContent = fill(raw).text;
+    $('dislikeBtn').classList.remove('hide');
+    SFX.secret(); buzz(30);
+    setTimeout(() => $('nextBtn').focus({ preventScroll:true }), 50);
+  });
 
   function showResult(cls, title, text, secs, num, p){
     $('sheet').className = 'sheet ' + cls;
+    $('topics').classList.add('hide');
     $('rCat').textContent = title;
     $('rNum').textContent = num; $('rNum').classList.toggle('hide', !num);
     $('rWho').textContent = cls === 'bumpall' ? `באמפ מספר ${st.bumps} – כולם שותים!` : p ? `ל${p}` : '';
@@ -746,7 +789,8 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     }).join('');
     const gone = new Set(all.filter(e => e.type === 'remove' && e.cat === rvCat).map(e => e.text));
     const added = all.filter(e => e.type === 'add' && e.cat === rvCat).sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(e => e.text);
-    const row = (t, isNew) => `<div class="rv-item ${gone.has(t) ? 'gone' : ''}"><p>${esc(t.replace(/\{p\}/g, '‹שם›').replace(/\s*\[(\d+)\]\s*$/, ' · $1 שנ׳'))}${isNew ? '<span class="new">חדש</span>' : ''}</p>
+    const tag = t => rvCat === 'secret' ? (TOPICS.find(x => x.id === topicOf(t)) || {}).emoji + ' ' : '';
+    const row = (t, isNew) => `<div class="rv-item ${gone.has(t) ? 'gone' : ''}"><p>${tag(t)}${esc(t.replace(/\{p\}/g, '‹שם›').replace(/\s*\[(\d+)\]\s*$/, ' · $1 שנ׳'))}${isNew ? '<span class="new">חדש</span>' : ''}</p>
       <button data-t="${encodeURIComponent(t)}" aria-label="${gone.has(t) ? 'להחזיר' : 'להוריד'}">${gone.has(t) ? '↩️' : '👎'}</button></div>`;
     $('rvList').innerHTML = (added.length ? `<div class="rv-sep">✨ חדשות (${added.length})</div>` + added.map(t => row(t, true)).join('') + '<div class="rv-sep">כל השאר</div>' : '')
       + D[rvCat].map(t => row(t, false)).join('');
@@ -797,15 +841,16 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
       'Good dares are hands-on party moments: chasers or body shots from the person on your left or right, blindfolded tasting, smelling or guessing by touch, building an outfit or a cocktail from 3 things in the house, passing things mouth to mouth, props from the fridge. Refer to people by where they sit (מי שמשמאלך, מי שמימינך, מי שמולך) as often as with {p}.',
       'Dares may end with [N] to show an N-second timer. Secret cards are a topic phrase the player then tells about, with no verb at the start, like "הלילה הכי פרוע שהיה לך".',
       'Do not repeat or paraphrase any existing card.',
+      'Secret cards belong to a topic. Topic ids: ' + TOPICS.map(t => t.id + ' (' + t.name + ')').join(', ') + '. Replace each rejected secret with a new one in the SAME topic.',
       '',
       ...cats.map(k => [
         `== ${k} (${CATS[k].name}) ==`,
         'Liked examples:', ...pick(activeList(k), 15).map(t => '- ' + t),
-        'Rejected by the group, avoid cards like these:', ...pendingList.filter(([, e]) => e.cat === k).map(([, e]) => '- ' + e.text),
+        'Rejected by the group, avoid cards like these:', ...pendingList.filter(([, e]) => e.cat === k).map(([, e]) => '- ' + e.text + (k === 'secret' ? '  [topic: ' + topicOf(e.text) + ']' : '')),
         'All existing cards (do not repeat):', activeList(k).join(' | '),
         `Write exactly ${need[k]} new ${k} card(s).`, ''
       ].join('\n')),
-      'Reply with only a JSON object like {"truth": ["..."], "dare": ["..."], "secret": ["..."]} containing only the categories asked for.'
+      'Reply with only a JSON object like {"truth": ["..."], "dare": ["..."], "secret": [{"topic": "abroad", "text": "..."}]} containing only the categories asked for.'
     ].join('\n');
 
     genBusy = true; $('rvGen').disabled = true; $('rvGen').textContent = '✍️ כותב שאלות חדשות…';
@@ -814,12 +859,21 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
       const res = await sample.json(prompt, { cache:false });
       let added = 0;
       for (const k of cats){
-        const arr = (res && Array.isArray(res[k]) ? res[k] : []).filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).slice(0, need[k]);
+        const mine = pendingList.filter(([, e]) => e.cat === k);
+        const raw = res && Array.isArray(res[k]) ? res[k] : [];
+        const arr = raw.map((x, i) => {
+          const text = typeof x === 'string' ? x : x && typeof x.text === 'string' ? x.text : '';
+          let topic = x && typeof x.topic === 'string' ? x.topic : '';
+          if (!TOPICS.some(t => t.id === topic)) topic = mine[i] ? topicOf(mine[i][1].text) : 'sex';
+          return { text:text.trim(), topic };
+        }).filter(x => x.text).slice(0, need[k]);
         for (let i = 0; i < arr.length; i++){
-          await putEdit('a-' + k + '-' + hash(arr[i]), { type:'add', cat:k, text:arr[i], ts:Date.now() + i });
+          const body = { type:'add', cat:k, text:arr[i].text, ts:Date.now() + i };
+          if (k === 'secret') body.topic = arr[i].topic;
+          await putEdit('a-' + k + '-' + hash(arr[i].text), body);
           added++;
         }
-        const done = pendingList.filter(([, e]) => e.cat === k).slice(0, arr.length);
+        const done = mine.slice(0, arr.length);
         for (const [id, e] of done) await putEdit(id, { ...e, replaced:true });
       }
       $('rvStatus').textContent = added ? `✨ נוספו ${added} שאלות חדשות. הן מסומנות "חדש" למעלה, ואפשר לתת גם להן 👎` : 'לא התקבלו שאלות. נסו שוב.';
