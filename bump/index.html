@@ -36,6 +36,7 @@ h1{font-family:Rubik,Heebo,sans-serif;font-size:58px;font-weight:900;margin:10px
 .pill{background:#ffffff14;border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-weight:700;font-size:14px;color:#fff}
 button{font:inherit;border:0;cursor:pointer;color:#fff;font-weight:800;transition:transform .12s,filter .2s}
 button:active{transform:scale(.95)}
+.pill.pill-new{background:linear-gradient(135deg,#a855f7,#e64ba0);border-color:transparent}
 
 /* bump meter */
 .meter{margin:4px auto 14px;max-width:380px}
@@ -129,8 +130,8 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   <span class="spark" style="top:300px;left:4%;font-size:22px;animation-delay:1.4s">⭐</span>
 
   <div class="bar">
-    <button class="pill" id="settingsBtn">⚙️ שחקנים והגדרות</button>
-    <span class="pill" id="spinCount">סיבוב 0</span>
+    <button class="pill" id="settingsBtn">⚙️ שחקנים</button>
+    <button class="pill pill-new" id="newBtn">🔄 משחק חדש</button>
     <button class="pill" id="muteBtn" aria-label="צלילים">🔊</button>
   </div>
 
@@ -145,6 +146,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   </div>
 
   <div class="turn" id="turn"></div>
+  <span class="hide" id="spinCount"></span>
 
   <div class="wheel-box" id="wheelBox">
     <div class="glow"></div>
@@ -175,6 +177,19 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   </div>
 </div>
 
+<!-- new game -->
+<div class="overlay hide" id="newOv" dir="rtl">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="newTitle">
+    <h2 id="newTitle">🔄 משחק חדש</h2>
+    <p class="small" style="font-size:15px;margin-bottom:16px">הבאמפים והסיבובים חוזרים לאפס, וכל השאלות מתערבבות מחדש.</p>
+    <div style="display:grid;gap:10px">
+      <button class="btn btn-pri" id="newSame" style="padding:15px">אותם חבר׳ה, מתחילים מחדש</button>
+      <button class="btn btn-pri" id="newOther" style="padding:15px;background:linear-gradient(135deg,#1ea5e6,#7c3aed)">חבר׳ה אחרים (מוחק גם את השמות)</button>
+      <button class="btn" id="newCancel" style="padding:13px">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- settings -->
 <div class="overlay hide" id="setOv" dir="rtl">
   <div class="panel">
@@ -197,11 +212,8 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     <h3>📊 סטטיסטיקה</h3>
     <div class="stats" id="stats"></div>
 
-    <h3>🔁 איפוס</h3>
-    <div class="row">
-      <button class="btn" id="resetBumps" style="flex:1">איפוס מונה באמפים</button>
-      <button class="btn" id="resetAll" style="flex:1">משחק חדש</button>
-    </div>
+    <h3>🔄 משחק חדש</h3>
+    <button class="btn" id="newBtn2" style="width:100%">להתחיל משחק חדש מאפס</button>
     <div class="row" style="margin-top:14px">
       <label class="small" style="flex:1;display:flex;align-items:center;gap:8px"><input type="checkbox" id="soundOpt"> צלילים ורטט</label>
       <button class="btn btn-pri" id="setClose">סגירה</button>
@@ -235,7 +247,9 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   let rotation = 0, spinning = false, decks = {}, current = null;
 
   // ---------- helpers ----------
-  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // crypto-grade random numbers, so the order really is unpredictable
+  const rnd = () => { try { const u = new Uint32Array(1); crypto.getRandomValues(u); return u[0] / 4294967296; } catch { return Math.random(); } };
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   // no repeats until every card of a category was used – remembered across reloads
   decks = store.get('decks', {});
@@ -253,8 +267,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     const others = st.players.filter(p => p !== me);
     let secs = 0;
     text = text.replace(/\s*\[(\d+)\]\s*$/, (_, s) => { secs = +s; return ''; });
-    if (!others.length) text = text.replace(/([לבשמ])-\{p\}/g, '$1מישהו/י לבחירתך');
-    text = text.replace(/\{p\}/g, () => others.length ? others[Math.random() * others.length | 0] : 'מישהו/י לבחירתך');
+    text = text.replace(/\{p\}/g, () => others.length ? others[rnd() * others.length | 0] : 'מישהו מהחבר׳ה');
     return { text, secs };
   }
 
@@ -460,7 +473,7 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     $('dots').innerHTML = Array.from({length:10}, (_, i) => `<i class="${i < inCycle ? 'on' : ''}"></i>`).join('');
     $('spinCount').textContent = `סיבוב ${st.spins}`;
     const p = curPlayer();
-    $('turn').innerHTML = p ? `התור של <b>${esc(p)}</b>` : '';
+    $('turn').innerHTML = (p ? `התור של <b>${esc(p)}</b> · ` : '') + `סיבוב ${st.spins + 1}`;
   }
 
   // ---------- spin ----------
@@ -477,11 +490,11 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
     busy = spinning = true; $('hub').classList.add('spinning'); $('hint').textContent = '🎡 מסתובב…';
     keepAwake();
     view.win = -1; document.body.classList.add('turning');
-    let idx = Math.random() * SEGS.length | 0;
+    let idx = rnd() * SEGS.length | 0;
     // soften long streaks: three of the same in a row becomes rarer
-    if (hist.length >= 2 && hist[0] === idx && hist[1] === idx) idx = Math.random() * SEGS.length | 0;
+    if (hist.length >= 2 && hist[0] === idx && hist[1] === idx) idx = rnd() * SEGS.length | 0;
     hist.unshift(idx); hist.length = Math.min(hist.length, 2);
-    const target = idx * SEG + 14 + Math.random() * (SEG - 28);   // wheel angle that ends under the pointer
+    const target = idx * SEG + 14 + rnd() * (SEG - 28);   // wheel angle that ends under the pointer
     const from = rotation;
     let to = from - (from % 360) + (360 - target) % 360;
     while (to - from < 360 * (reduce ? 2 : 6)) to += 360;
@@ -633,22 +646,27 @@ input[type=text]{flex:1;min-width:0;font:inherit;color:#fff;background:#00000040
   }
   $('soundOpt').onchange = () => setSound($('soundOpt').checked);
   $('muteBtn').onclick = () => setSound(!st.sound);
-  // tap twice to confirm (dialogs are blocked when hosted)
-  function armed(btn){
-    if (btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.label; return true; }
-    btn.dataset.label = btn.textContent; btn.dataset.armed = 1; btn.textContent = 'לחצו שוב לאישור';
-    setTimeout(() => { if (btn.dataset.armed){ delete btn.dataset.armed; btn.textContent = btn.dataset.label; } }, 3000);
-    return false;
-  }
-  $('resetBumps').onclick = e => { if (armed(e.currentTarget)){ st.bumps = 0; save(); renderSettings(); renderHUD(); } };
-  $('resetAll').onclick = e => {
-    if (!armed(e.currentTarget)) return;
+  function newGame(clearPlayers){
     Object.assign(st, { bumps:0, spins:0, turn:0, counts:{truth:0,dare:0,secret:0,bump:0,bumpall:0} });
-    decks = {}; store.set('decks', decks); hist = []; save(); renderSettings(); renderHUD();
-  };
+    if (clearPlayers) st.players = [];
+    decks = {}; store.set('decks', decks); hist = [];
+    // start with the wheel at a random angle too
+    rotation = rnd() * 360; view.rot = rotation; view.win = -1; render();
+    save(); renderHUD();
+    $('newOv').classList.add('hide');
+    $('hint').textContent = '🎲 משחק חדש! לחצו על מרכז הגלגל';
+    SFX.add(); confetti(30);
+    if (clearPlayers){ renderSettings(); $('setOv').classList.remove('hide'); setTimeout(() => $('pName').focus(), 100); }
+  }
+  const openNew = () => { if (!spinning) { $('setOv').classList.add('hide'); $('newOv').classList.remove('hide'); SFX.ui(); } };
+  $('newBtn').onclick = openNew;
+  $('newBtn2').onclick = openNew;
+  $('newSame').onclick = () => newGame(false);
+  $('newOther').onclick = () => newGame(true);
+  $('newCancel').onclick = () => $('newOv').classList.add('hide');
   document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => {
     if (e.target !== o) return;
-    if (o.id === 'setOv'){ o.classList.add('hide'); renderHUD(); }
+    if (o.id === 'setOv' || o.id === 'newOv'){ o.classList.add('hide'); renderHUD(); }
   }));
 
   buildWheel(); setPhoto(); renderHUD(); setSound(st.sound, true);
